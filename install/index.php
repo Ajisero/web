@@ -1,0 +1,20 @@
+<?php
+declare(strict_types=1); require __DIR__.'/../includes/bootstrap.php';
+if(installed()){echo '<!doctype html><meta charset="utf-8"><style>body{font-family:system-ui;padding:40px}</style><h1>Escabeche Don Edgar</h1><p>La aplicación ya está instalada.</p><p><a href="../index.php">Abrir tienda</a> · <a href="../admin/">Administración</a></p>';exit;}
+$msg='';
+if($_SERVER['REQUEST_METHOD']==='POST'){
+ try{
+  $host=trim($_POST['db_host']??'localhost');$name=trim($_POST['db_name']??'');$user=trim($_POST['db_user']??'');$pass=$_POST['db_pass']??'';$admin=trim($_POST['admin_user']??'admin');$adminPass=$_POST['admin_pass']??'';
+  if(!$name||!$user||strlen($adminPass)<8)throw new RuntimeException('Completa la base de datos y usa una contraseña de administrador de al menos 8 caracteres.');
+  $pdo=new PDO("mysql:host={$host};dbname={$name};charset=utf8mb4",$user,$pass,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_EMULATE_PREPARES=>false]);
+  $sql=file_get_contents(__DIR__.'/../database/schema.sql');foreach(array_filter(array_map('trim',preg_split('/;\s*(?:\r?\n|$)/',$sql))) as $stmt)$pdo->exec($stmt);
+  $cfg="<?php\nreturn ".var_export(['db'=>['host'=>$host,'name'=>$name,'user'=>$user,'pass'=>$pass,'charset'=>'utf8mb4'],'app'=>['base_url'=>'','environment'=>'production']],true).";\n";file_put_contents(__DIR__.'/../config/config.php',$cfg,LOCK_EX);chmod(__DIR__.'/../config/config.php',0640);
+  $ins=$pdo->prepare('INSERT INTO admins(username,password_hash) VALUES(?,?)');$ins->execute([$admin,password_hash($adminPass,PASSWORD_DEFAULT)]);
+  $products=[['clasico','Clásico','Ají cambita de colores en rodajitas, cebollita verde, pimentón de colores, pepinillos, vinagre y salsa soya.',60,'assets/img/clasico.webp',1],['palmito','Con Palmito','La receta clásica con un toque de palmito.',60,'assets/img/palmito.webp',2],['champinones','Con Champiñones','La receta clásica con champiñones.',60,'assets/img/champinones.webp',3],['repollito','Con Repollito','La receta clásica con repollito.',60,'assets/img/repollito.webp',4]];
+  $p=$pdo->prepare('INSERT INTO products(slug,name,description,price,image,sort_order) VALUES(?,?,?,?,?,?)');foreach($products as $row)$p->execute($row);
+  $zones=[['Retiro personal en La Guardia',0,0,1],['Delivery hasta 4.º anillo',15,0,2],['Delivery zona central / 1.er anillo',25,0,3],['Otra zona (precio por confirmar)',0,1,4]];$z=$pdo->prepare('INSERT INTO delivery_zones(name,price,requires_quote,sort_order) VALUES(?,?,?,?)');foreach($zones as $row)$z->execute($row);
+  $settings=['business_name'=>'Escabeche Don Edgar','whatsapp'=>'59170000000','qr_image'=>'assets/img/qr-demo.webp','pickup_address'=>'Doble Vía La Guardia, km 20 (configura la dirección exacta)','business_lat'=>'','business_lng'=>'','demo_mode'=>'1'];$s=$pdo->prepare('INSERT INTO settings(setting_key,setting_value) VALUES(?,?)');foreach($settings as $k=>$v)$s->execute([$k,$v]);
+  header('Location: ../admin/login.php?installed=1');exit;
+ }catch(Throwable $e){$msg=$e->getMessage(); if(is_file(__DIR__.'/../config/config.php'))@unlink(__DIR__.'/../config/config.php');}
+}
+?><!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Instalar Escabeche Don Edgar</title><link rel="stylesheet" href="../assets/css/app.css"></head><body><main class="installer"><div class="install-card"><span class="eyebrow">INSTALADOR</span><h1>Escabeche Don Edgar</h1><p>Conecta la base MySQL y crea el primer administrador.</p><?php if($msg):?><div class="error"><?=h($msg)?></div><?php endif;?><form method="post"><label>Host MySQL<input name="db_host" value="localhost" required></label><label>Base de datos<input name="db_name" required></label><label>Usuario MySQL<input name="db_user" required></label><label>Contraseña MySQL<input type="password" name="db_pass"></label><hr><label>Usuario administrador<input name="admin_user" value="admin" required></label><label>Contraseña administrador<input type="password" name="admin_pass" minlength="8" required></label><button class="btn primary wide">Instalar aplicación</button></form></div></main></body></html>

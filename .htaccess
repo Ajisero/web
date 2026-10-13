@@ -1,0 +1,6 @@
+Options -Indexes
+RewriteEngine On
+# Bloquear acceso directo a config y database
+RewriteRule ^config/ - [F,L]
+RewriteRule ^database/ - [F,L]
+RewriteRule ^storage/uploads/.*\.(php|phar|phtml|php[0-9]*)$ - [F,L,NC]
